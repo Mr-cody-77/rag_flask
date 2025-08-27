@@ -1,0 +1,7 @@
+flask
+langchain
+langchain_community
+openai
+chromadb
+xarray
+gunicorn
