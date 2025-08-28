@@ -5,3 +5,5 @@ openai
 chromadb
 xarray
 gunicorn
+huggingface_hub
+sentence-transformers
