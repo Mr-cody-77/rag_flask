@@ -83,3 +83,6 @@ def ask():
 
 # ---------- 4. gunicorn entrypoint ----------
 # Render “Start Command”: gunicorn -w 1 -b 0.0.0.0:$PORT flask_app:app
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)
