@@ -5,7 +5,8 @@ from langchain.chains import RetrievalQA
 from langchain_chroma import Chroma
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from functools import lru_cache
-
+import logging
+logging.basicConfig(level=logging.INFO)
 # ---------- 0. basic config ----------
 load_dotenv()
 
@@ -16,7 +17,7 @@ assert GEMINI_API_KEY, "Set GEMINI_API_KEY env var"
 # Chroma API credentials
 CHROMA_API_KEY = os.getenv("CHROMA_API_KEY")
 CHROMA_TENANT = os.getenv("CHROMA_TENANT")
-CHROMA_DATABASE = os.getenv("CHROMA_DATABASE", "flask_rag_db")
+CHROMA_DATABASE = os.getenv("CHROMA_DATABASE", "agro_rag_db")
 
 assert CHROMA_API_KEY and CHROMA_TENANT, "Set Chroma API credentials in .env"
 
@@ -68,18 +69,21 @@ def ask():
         if not query:
             return jsonify({"error": "query required"}), 400
 
+        logging.info(f"Received query: {query}")
         rag_chain = get_rag_chain()
+        logging.info("Calling RAG chain...")
         result = rag_chain({"query": query})
+        logging.info("RAG chain returned successfully")
 
         answer = result["result"]
         sources = [
             {"id": doc.metadata.get("file", ""), "snippet": doc.page_content[:120]}
             for doc in result["source_documents"]
         ]
-
         return jsonify({"answer": answer, "sources": sources})
 
     except Exception as e:
+        logging.exception("Error in /ask endpoint")
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
 # ---------- 4. gunicorn entrypoint ----------
