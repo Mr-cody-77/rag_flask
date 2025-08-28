@@ -2,7 +2,7 @@ import os, traceback
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 from langchain.chains import RetrievalQA
-from langchain.vectorstores import Chroma
+from langchain_chroma import Chroma
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from functools import lru_cache
 
@@ -46,8 +46,9 @@ def get_rag_chain():
         embedding_function=emb,
         client_settings={
             "chroma_api_impl": "rest",
-            "chroma_api_key": CHROMA_API_KEY,
-            "chroma_tenant": CHROMA_TENANT,
+            "api_key": CHROMA_API_KEY,
+            "tenant": CHROMA_TENANT,
+            "database": CHROMA_DATABASE
         }
     )
 
