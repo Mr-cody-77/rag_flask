@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from langchain.chains import RetrievalQA
 from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import SentenceTransformerEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.llms import HuggingFaceHub
 import os
 import traceback
@@ -9,15 +9,18 @@ import traceback
 app = Flask(__name__)
 
 # -----------------------------
-# Embeddings (lightweight)
+# Embeddings via API (no local model)
 # -----------------------------
-embeddings = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
+embeddings = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/all-MiniLM-L6-v2",
+    huggingfacehub_api_token=os.getenv("HUGGINGFACE_API_KEY")
+)
 
 # -----------------------------
-# LLM (HuggingFace Inference API)
+# LLM via Inference API
 # -----------------------------
 llm = HuggingFaceHub(
-    repo_id="google/flan-t5-mini",  # very small, CPU-friendly
+    repo_id="google/flan-t5-mini",  # small & fast
     model_kwargs={"temperature": 0, "max_new_tokens": 150},
     huggingfacehub_api_token=os.getenv("HUGGINGFACE_API_KEY")
 )
@@ -28,13 +31,13 @@ llm = HuggingFaceHub(
 vector_store = Chroma(
     collection_name="agro_rag_collection",
     embedding_function=embeddings,
-    chroma_api_impl="cloud",  # mandatory for cloud usage
+    chroma_api_impl="cloud",
     chroma_cloud_api_key=os.getenv("CHROMA_API_KEY"),
     tenant=os.getenv("CHROMA_TENANT"),
     database=os.getenv("CHROMA_DATABASE"),
 )
 
-retriever = vector_store.as_retriever(search_kwargs={"k": 3})  # smaller k to save RAM
+retriever = vector_store.as_retriever(search_kwargs={"k": 3})
 
 # -----------------------------
 # Retrieval QA chain
@@ -68,6 +71,5 @@ def ask_query():
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
 if __name__ == "__main__":
-    # Use Render-assigned port or default 5000
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
