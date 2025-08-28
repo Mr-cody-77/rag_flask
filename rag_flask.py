@@ -12,17 +12,14 @@ app = Flask(__name__)
 # Embeddings via API (no local model)
 # -----------------------------
 embeddings = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-MiniLM-L6-v2",
-    huggingfacehub_api_token=os.getenv("HUGGINGFACE_API_KEY")
+    model_name="sentence-transformers/all-MiniLM-L6-v2"
 )
-
 # -----------------------------
 # LLM via Inference API
 # -----------------------------
 llm = HuggingFaceHub(
-    repo_id="google/flan-t5-mini",  # small & fast
-    model_kwargs={"temperature": 0, "max_new_tokens": 150},
-    huggingfacehub_api_token=os.getenv("HUGGINGFACE_API_KEY")
+    repo_id="google/flan-t5-mini",
+    model_kwargs={"temperature": 0, "max_new_tokens": 150}
 )
 
 # -----------------------------
