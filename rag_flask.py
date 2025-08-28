@@ -1,24 +1,23 @@
 from flask import Flask, request, jsonify
 from langchain.chains import RetrievalQA
-import os
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import SentenceTransformerEmbeddings
 from langchain_community.llms import HuggingFaceHub
+import os
 import traceback
 
 app = Flask(__name__)
 
 # -----------------------------
-# Embeddings (free & lightweight)
+# Embeddings (lightweight)
 # -----------------------------
 embeddings = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
 
 # -----------------------------
-# LLM (small model via HuggingFaceHub)
+# LLM (HuggingFace Inference API)
 # -----------------------------
-# Use a small CPU-friendly model
 llm = HuggingFaceHub(
-    repo_id="google/flan-t5-small",  # small & fast
+    repo_id="google/flan-t5-small",  # small hosted model on HF
     model_kwargs={"temperature": 0, "max_new_tokens": 200},
     huggingfacehub_api_token=os.getenv("HUGGINGFACE_API_KEY")
 )
@@ -29,7 +28,7 @@ llm = HuggingFaceHub(
 vector_store = Chroma(
     collection_name="agro_rag_collection",
     embedding_function=embeddings,
-    chroma_api_impl="cloud",  # must specify cloud
+    chroma_api_impl="cloud",
     chroma_cloud_api_key=os.getenv("CHROMA_API_KEY"),
     tenant=os.getenv("CHROMA_TENANT"),
     database=os.getenv("CHROMA_DATABASE"),
@@ -67,7 +66,6 @@ def ask_query():
 
     except Exception as e:
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
