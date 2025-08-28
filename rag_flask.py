@@ -1,72 +1,76 @@
-from flask import Flask, request, jsonify
-from langchain.chains import RetrievalQA
-from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.llms import HuggingFaceHub
-import os
-import traceback
+import os, gc, traceback, datetime, json, sqlite3, multiprocessing
+from typing import Dict, Any, List
 
+from flask import Flask, request, jsonify
+from dotenv import load_dotenv
+from sqlalchemy import create_engine, text, MetaData, Table, Column, Integer, String
+from langchain.chains import RetrievalQA
+from langchain.vectorstores import Chroma
+from langchain_google_genai import (
+    ChatGoogleGenerativeAI,
+    GoogleGenerativeAIEmbeddings,
+)
+
+# ---------- 0. basic config ----------
+load_dotenv()
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+assert GEMINI_API_KEY, "Set GEMINI_API_KEY env var"
+
+STORAGE_ROOT = os.getenv("AGENTIC_RAG_STORAGE", "./storage")
+os.makedirs(STORAGE_ROOT, exist_ok=True)
+CHROMA_DIR = os.path.join(STORAGE_ROOT, "chromadb")
+os.makedirs(CHROMA_DIR, exist_ok=True)
+
+# ---------- 1. Flask ----------
 app = Flask(__name__)
 
-# -----------------------------
-# Embeddings via API (no local model)
-# -----------------------------
-embeddings = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-MiniLM-L6-v2"
+# ---------- 2. Build the RAG chain ONCE globally ----------
+# This is the most critical change. The objects are created when the app starts.
+llm = ChatGoogleGenerativeAI(
+    model="gemini-1.5-flash",
+    temperature=0,
+    google_api_key=GEMINI_API_KEY,
 )
-# -----------------------------
-# LLM via Inference API
-# -----------------------------
-llm = HuggingFaceHub(
-    repo_id="google/flan-t5-mini",
-    model_kwargs={"temperature": 0, "max_new_tokens": 150}
+emb = GoogleGenerativeAIEmbeddings(
+    model="models/embedding-001",
+    google_api_key=GEMINI_API_KEY,
 )
-
-# -----------------------------
-# Vector store (Chroma Cloud)
-# -----------------------------
-vector_store = Chroma(
-    collection_name="agro_rag_collection",
-    embedding_function=embeddings,
-    chroma_api_impl="cloud",
-    chroma_cloud_api_key=os.getenv("CHROMA_API_KEY"),
-    tenant=os.getenv("CHROMA_TENANT"),
-    database=os.getenv("CHROMA_DATABASE"),
+vectordb = Chroma(
+    collection_name="ar_floats",
+    embedding_function=emb,
+    persist_directory=CHROMA_DIR,
 )
-
-retriever = vector_store.as_retriever(search_kwargs={"k": 3})
-
-# -----------------------------
-# Retrieval QA chain
-# -----------------------------
-qa_chain = RetrievalQA.from_chain_type(
+retriever = vectordb.as_retriever(search_kwargs={"k": 2})
+rag_chain = RetrievalQA.from_chain_type(
     llm,
     retriever=retriever,
-    return_source_documents=True
+    return_source_documents=True,
 )
 
-# -----------------------------
-# API Endpoint
-# -----------------------------
+# ---------- 3. REST endpoint ----------
 @app.route("/ask", methods=["POST"])
-def ask_query():
+def ask():
     try:
-        data = request.get_json()
-        query = data.get("query", "").strip()
+        query = request.json.get("query", "").strip()
         if not query:
-            return jsonify({"error": "No query provided"}), 400
+            return jsonify({"error": "query required"}), 400
 
-        result = qa_chain({"query": query})
-        answer = result.get("result", "")
+        # Reuse the globally created rag_chain for each request
+        result = rag_chain({"query": query})
+
+        answer = result["result"]
         sources = [
-            {"id": doc.metadata.get("id", ""), "snippet": doc.page_content[:200]}
-            for doc in result.get("source_documents", [])
+            {
+                "id": doc.metadata.get("file", ""),
+                "snippet": doc.page_content[:120],
+            }
+            for doc in result["source_documents"]
         ]
-        return jsonify({"answer": answer, "sources": sources})
 
+        # No need for explicit teardown
+        return jsonify({"answer": answer, "sources": sources})
     except Exception as e:
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+# ---------- 4. gunicorn entrypoint ----------
+# In Render “Start Command”:  gunicorn -w 1 -b 0.0.0.0:$PORT flask_app:app

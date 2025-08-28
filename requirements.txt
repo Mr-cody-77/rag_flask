@@ -1,9 +1,20 @@
-flask
-langchain
-langchain_community
-openai
-chromadb
-xarray
-gunicorn
-huggingface_hub
-sentence-transformers
+# Core
+Flask>=2.3.0
+gunicorn>=20.1.0
+python-dotenv>=1.0.0
+
+# LangChain and Google Gemini integration
+langchain>=0.2.41
+langchain-google-genai>=0.1.0
+
+# Vector database
+chromadb>=0.4.0
+
+# SQL support (if you use sqlite/SQLAlchemy for storage)
+SQLAlchemy>=2.0.19
+
+# Optional: type hints and utils
+typing_extensions>=4.6.3
+
+# Avoid huggingface local models to save memory
+# No torch / transformers required
