@@ -54,11 +54,11 @@ def get_rag_chain():
     )
 
     # Attach to the same collection
-    collection = client.get_collection("agro_rag_collection")
+    collection = client.get_collection("argo_dataset")
 
     vectordb = Chroma(
         client=client,
-        collection_name="agro_rag_collection",
+        collection_name="arga_dataset",
         embedding_function=emb,
     )
 
