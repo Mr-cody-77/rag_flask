@@ -5,12 +5,14 @@ from langchain.chains import RetrievalQA
 from langchain_chroma import Chroma
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from functools import lru_cache
+
 import logging
 logging.basicConfig(level=logging.INFO)
+
 # ---------- 0. basic config ----------
 load_dotenv()
 
-# LLM API key
+# Gemini API key
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 assert GEMINI_API_KEY, "Set GEMINI_API_KEY env var"
 
@@ -25,33 +27,36 @@ assert CHROMA_API_KEY and CHROMA_TENANT, "Set Chroma API credentials in .env"
 app = Flask(__name__)
 
 # ---------- 2. Lazy-load RAG chain ----------
+
 @lru_cache(maxsize=1)
 def get_rag_chain():
     """Initialize and return the RAG chain. Cached to reuse for subsequent requests."""
-    # LLM
+
+    # LLM -> Gemini
     llm = ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash",
-        temperature=0,
+        model="gemini-1.5-flash",   # lightweight + cheap, good for retrieval
         google_api_key=GEMINI_API_KEY,
+        temperature=0
     )
 
-    # Embeddings
+    # Embeddings -> Gemini (must match ingestion model)
     emb = GoogleGenerativeAIEmbeddings(
         model="models/embedding-001",
-        google_api_key=GEMINI_API_KEY,
+        google_api_key=GEMINI_API_KEY
     )
 
     # Remote Chroma (API-based)
     vectordb = Chroma(
-        collection_name=CHROMA_DATABASE,
+        collection_name="agro_rag_collection",   # same as ingestion
         embedding_function=emb,
         client_settings={
             "chroma_api_impl": "rest",
-            "api_key": CHROMA_API_KEY,
+            "chroma_server_api_key": CHROMA_API_KEY,
             "tenant": CHROMA_TENANT,
-            "database": CHROMA_DATABASE
+            "database": "flask_rag_db"           # same as ingestion
         }
     )
+
 
     retriever = vectordb.as_retriever(search_kwargs={"k": 2})
 
