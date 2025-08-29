@@ -5,6 +5,7 @@ from langchain.chains import RetrievalQA
 from langchain_chroma import Chroma
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from functools import lru_cache
+from chromadb import CloudClient
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -46,17 +47,20 @@ def get_rag_chain():
     )
 
     # Remote Chroma (API-based)
-    vectordb = Chroma(
-        collection_name="agro_rag_collection",   # same as ingestion
-        embedding_function=emb,
-        client_settings={
-            "chroma_api_impl": "rest",
-            "chroma_server_api_key": CHROMA_API_KEY,
-            "tenant": CHROMA_TENANT,
-            "database": "flask_rag_db"           # same as ingestion
-        }
+    client = CloudClient(
+        api_key=os.getenv("CHROMA_API_KEY"),
+        tenant=os.getenv("CHROMA_TENANT"),
+        database="flask_rag_db"   # <-- explicitly set database name
     )
 
+    # Attach to the same collection
+    collection = client.get_collection("agro_rag_collection")
+
+    vectordb = Chroma(
+        client=client,
+        collection_name="agro_rag_collection",
+        embedding_function=emb,
+    )
 
     retriever = vectordb.as_retriever(search_kwargs={"k": 2})
 
