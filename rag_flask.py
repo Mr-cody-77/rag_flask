@@ -58,7 +58,7 @@ def get_rag_chain():
 
     vectordb = Chroma(
         client=client,
-        collection_name="arga_dataset",
+        collection_name="argo_dataset",
         embedding_function=emb,
     )
 
