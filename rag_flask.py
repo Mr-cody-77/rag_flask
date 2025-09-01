@@ -85,10 +85,21 @@ def ask():
         logging.info("RAG chain returned successfully")
 
         answer = result["result"]
-        sources = [
-            {"id": doc.metadata.get("file", ""), "snippet": doc.page_content[:120]}
-            for doc in result["source_documents"]
-        ]
+
+        sources = []
+        for doc in result["source_documents"]:
+            meta = doc.metadata
+            snippet = doc.page_content[:200]  # little longer context
+            sources.append({
+                "latitude": meta.get("latitude"),
+                "longitude": meta.get("longitude"),
+                "time": meta.get("time"),
+                "temp_mean": meta.get("temp_mean"),
+                "sal_mean": meta.get("sal_mean"),
+                "pres_mean": meta.get("pres_mean"),
+                "snippet": snippet
+            })
+
         return jsonify({"answer": answer, "sources": sources})
 
     except Exception as e:
