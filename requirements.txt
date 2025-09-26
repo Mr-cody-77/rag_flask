@@ -15,6 +15,7 @@ SQLAlchemy>=2.0.19
 
 # Optional: type hints and utils
 typing_extensions>=4.6.3
-
+sentence-transformers>=2.2.2
+torch>=2.1.0
 # Avoid huggingface local models to save memory
 # No torch / transformers required
