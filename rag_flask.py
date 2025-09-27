@@ -13,8 +13,8 @@ logging.basicConfig(level=logging.INFO)
 
 # ---------- 0. basic config ----------
 load_dotenv()
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-assert GEMINI_API_KEY, "Set GEMINI_API_KEY env var"
+GEMINI_API_KEY = "AIzaSyC5FJ82qs6Tl5HeM8MK3yEhidLQ2ELuaf4"
+
 
 CHROMA_API_KEY = os.getenv("CHROMA_API_KEY")
 CHROMA_TENANT = os.getenv("CHROMA_TENANT")
