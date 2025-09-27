@@ -6,9 +6,7 @@ URL = "http://127.0.0.1:5000/ask"
 
 # Test queries
 test_queries = [
-    "What is the average temperature of float 13857?",
-    "Give me the location and date of the first cycle.",
-    "Show me salinity data from float 13857"
+    "what is the temperature at the latitude and longitude of atlantic ocean?"
 ]
 
 for query in test_queries:
