@@ -18,7 +18,7 @@ assert GEMINI_API_KEY, "Set GEMINI_API_KEY env var"
 
 CHROMA_API_KEY = os.getenv("CHROMA_API_KEY")
 CHROMA_TENANT = os.getenv("CHROMA_TENANT")
-CHROMA_DATABASE = os.getenv("CHROMA_DATABASE", "flask_rag_db")
+CHROMA_DATABASE = "flask_rag_db"  # MUST match server database
 assert CHROMA_API_KEY and CHROMA_TENANT, "Set Chroma API credentials in .env"
 
 # ---------- 1. Flask ----------
@@ -27,10 +27,8 @@ app = Flask(__name__)
 # ---------- 2. Lazy-load RAG chain ----------
 @lru_cache(maxsize=1)
 def get_rag_chain():
-    """Initialize and return the RAG chain. Cached to reuse for subsequent requests."""
-
     logging.info("Initializing RAG chain...")
-    
+
     # LLM -> Gemini
     llm = ChatGoogleGenerativeAI(
         model="gemini-1.5-flash",
@@ -51,9 +49,11 @@ def get_rag_chain():
         database=CHROMA_DATABASE
     )
 
+    # Collection inside the database
     collection_name = "argo_data"
     collection = client.get_or_create_collection(collection_name)
 
+    # Attach Chroma vector DB
     vectordb = Chroma(
         client=client,
         collection_name=collection_name,
@@ -82,8 +82,7 @@ def ask():
         logging.info(f"Received query: {query}")
         rag_chain = get_rag_chain()
         logging.info("Calling RAG chain...")
-        
-        # Wrap in try-except to capture internal chain errors
+
         try:
             result = rag_chain({"query": query})
         except Exception as chain_err:
