@@ -4,7 +4,7 @@ from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 from langchain.chains import RetrievalQA
 from langchain_chroma import Chroma
-from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
+from langchain_google_genai import ChatGoogleGenerativeAI
 from functools import lru_cache
 from chromadb import CloudClient
 import logging
@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.INFO)
 # ---------- 0. basic config ----------
 load_dotenv()
 GEMINI_API_KEY = "AIzaSyB9e7vyRogVxPw92vCBwIsOIFCxpKH5ng8"
-
+assert GEMINI_API_KEY, "Set GEMINI_API_KEY env var"
 
 CHROMA_API_KEY = os.getenv("CHROMA_API_KEY")
 CHROMA_TENANT = os.getenv("CHROMA_TENANT")
@@ -29,20 +29,14 @@ app = Flask(__name__)
 def get_rag_chain():
     logging.info("Initializing RAG chain...")
 
-    # LLM -> Gemini
+    # LLM -> Gemini (only for generation, NOT embeddings)
     llm = ChatGoogleGenerativeAI(
         model="gemini-1.5-flash",
         google_api_key=GEMINI_API_KEY,
         temperature=0
     )
 
-    # Embeddings -> Gemini
-    emb = GoogleGenerativeAIEmbeddings(
-        model="models/embedding-001",
-        google_api_key=GEMINI_API_KEY
-    )
-
-    # Remote Chroma client
+    # Remote Chroma client (already contains precomputed embeddings)
     client = CloudClient(
         api_key=CHROMA_API_KEY,
         tenant=CHROMA_TENANT,
@@ -51,13 +45,12 @@ def get_rag_chain():
 
     # Collection inside the database
     collection_name = "argo_data"
-    collection = client.get_or_create_collection(collection_name)
 
-    # Attach Chroma vector DB
+    # Attach Chroma vector DB without creating new embeddings
     vectordb = Chroma(
         client=client,
         collection_name=collection_name,
-        embedding_function=emb
+        embedding_function=None  # <- Important: don't compute embeddings on queries
     )
 
     retriever = vectordb.as_retriever(search_kwargs={"k": 2})
