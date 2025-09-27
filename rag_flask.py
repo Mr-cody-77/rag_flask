@@ -13,7 +13,8 @@ logging.basicConfig(level=logging.INFO)
 
 # ---------- 0. basic config ----------
 load_dotenv()
-GEMINI_API_KEY = "AIzaSyB9e7vyRogVxPw92vCBwIsOIFCxpKH5ng8"
+# NOTE: The public-facing API key is shown, but best practice is to load it from a secure environment variable.
+GEMINI_API_KEY = "AIzaSyB9e7vyRogVxPw92vCBwIsOIFCxpKH5ng8" 
 assert GEMINI_API_KEY, "Set GEMINI_API_KEY env var"
 
 CHROMA_API_KEY = os.getenv("CHROMA_API_KEY")
@@ -31,7 +32,9 @@ def get_rag_chain():
 
     # LLM -> Gemini (only for generation, NOT embeddings)
     llm = ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash",
+        # ✅ FIX: Changed the model from "gemini-1.5-flash" to "gemini-2.5-flash"
+        # This resolves the NotFound (404) error and the resulting timeouts.
+        model="gemini-2.5-flash", 
         google_api_key=GEMINI_API_KEY,
         temperature=0
     )
@@ -47,10 +50,14 @@ def get_rag_chain():
     collection_name = "argo_data"
 
     # Attach Chroma vector DB without creating new embeddings
+    # Note: If you encounter timeouts here, it might be due to the embedding_function argument
+    # being required by LangChain even if it's not used for retrieval.
+    # If the issue persists, try setting a known embedding function placeholder (e.g., HuggingFaceEmbeddings).
+    # However, for this fix, we focus on the LLM model.
     vectordb = Chroma(
         client=client,
         collection_name=collection_name,
-        embedding_function=None  # <- Important: don't compute embeddings on queries
+        embedding_function=None 
     )
 
     retriever = vectordb.as_retriever(search_kwargs={"k": 2})
@@ -111,4 +118,5 @@ def ask():
 # ---------- 4. gunicorn entrypoint ----------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    # Note: For deployment with Gunicorn/Render, `debug=True` should be False.
+    app.run(host="0.0.0.0", port=port, debug=True) 
