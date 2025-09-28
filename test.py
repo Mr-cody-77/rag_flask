@@ -6,7 +6,8 @@ URL = "http://127.0.0.1:5000/ask"
 
 # Test queries
 test_queries = [
-    "what is the temperature at the latitude and longitude of atlantic ocean?"
+
+    "Give me the coordinates bay of bangal Ocean or any sea with the sea name"
 ]
 
 for query in test_queries:
