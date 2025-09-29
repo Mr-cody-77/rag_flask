@@ -1,3 +1,4 @@
+
 import requests
 import json
 
@@ -6,8 +7,9 @@ URL = "http://127.0.0.1:5000/ask"
 
 # Test queries
 test_queries = [
-
-    "Give me the coordinates bay of bangal Ocean or any sea with the sea name"
+    "Give me the coordinates bay of bengal Ocean or any sea with the sea name",
+    "what is the salinity at pacific ocean",
+    "what are the floats near atlantic ocean and india",
 ]
 
 for query in test_queries:
