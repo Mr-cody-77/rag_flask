@@ -1,9 +1,10 @@
+
 import os
 import traceback
 import logging
 import math
 from functools import lru_cache
-import asyncio
+
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 
@@ -21,7 +22,7 @@ GEMINI_API_KEY = _env("GEMINI_API_KEY")
 CHROMA_API_KEY = _env("CHROMA_API_KEY")
 CHROMA_TENANT = _env("CHROMA_TENANT")
 CHROMA_DATABASE = _env("CHROMA_DATABASE") or "flask_rag_db"
-CHROMA_COLLECTION = _env("CHROMA_COLLECTION") or "argo_data_local"
+CHROMA_COLLECTION = _env("CHROMA_COLLECTION") or "argo_dataset"
 
 # Warnings instead of asserts so the server can start for debugging
 if not GEMINI_API_KEY:
@@ -132,13 +133,6 @@ def is_temperature_query(query):
     temp_tokens = ("temp", "temperature", "temparture", "temprt", "sea temperature", "surface temp", "water temp")
     return any(tok in q for tok in temp_tokens)
 
-def ensure_event_loop():
-    """Make sure each thread has an asyncio event loop."""
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
 # ---------- 4. Lazy-load RAG chain (attempt) ----------
 @lru_cache(maxsize=1)
 def get_rag_chain():
@@ -146,66 +140,41 @@ def get_rag_chain():
     Try to initialize an actual RAG chain if libraries and credentials are available.
     If any import or auth step fails, raise RuntimeError — caller will handle fallback.
     """
-    ensure_event_loop()
-
+    # imports are attempted lazily to avoid ImportError at module import time
     try:
         if not GEMINI_API_KEY:
             raise RuntimeError("GEMINI_API_KEY not set — cannot initialize LLM.")
         if not (CHROMA_API_KEY and CHROMA_TENANT):
             raise RuntimeError("CHROMA credentials not set — cannot initialize Chroma client.")
 
-        # Imports (lazy)
-        from langchain.chains import RetrievalQA
-        from langchain_chroma import Chroma
-        from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
-        from chromadb import CloudClient
-        from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
+        # try importing optional libraries
+        try:
+            from langchain.chains import RetrievalQA
+            from langchain_chroma import Chroma
+            from langchain_google_genai import ChatGoogleGenerativeAI
+            from chromadb import CloudClient
+        except Exception as e:
+            raise RuntimeError(f"Required langchain/chroma packages not available: {e}")
 
         logger.info("Initializing RAG chain (langchain + chroma + gemini)...")
-
-        # 1. Build system + human prompt template
-        system_template = (
-            "You are an oceanography expert. Respond in a friendly, scientific way. "
-            "PSAL = salinity, TEMP = temperature, PRES = pressure. "
-            "If user gives an ocean/sea, infer coordinates and filter ChromaDB profiles nearby. "
-            "If no profiles exist, return approximate coordinates from internal knowledge."
-        )
-        system_prompt = SystemMessagePromptTemplate.from_template(system_template)
-        human_prompt = HumanMessagePromptTemplate.from_template("{query}")
-        chat_prompt = ChatPromptTemplate.from_messages([system_prompt, human_prompt])
-
-        # 2. Initialize LLM
         llm = ChatGoogleGenerativeAI(
             model="gemini-2.5-flash",
-            model_kwargs={
-                "system_instruction": "You are an ocean science assistant..."
-            }
+            google_api_key=GEMINI_API_KEY,
+            temperature=0,
+            system_prompt=(
+                "You are an oceanography expert. Respond in a friendly, scientific way. "
+                "PSAL = salinity, TEMP = temperature, PRES = pressure. "
+                "If user gives an ocean/sea, infer coordinates and filter ChromaDB profiles nearby. "
+                "If no profiles exist, return approximate coordinates from internal knowledge."
+            )
         )
 
-        # 3. Embeddings
-        embedding_function = GoogleGenerativeAIEmbeddings(
-            model="embedding-001",
-            google_api_key=GEMINI_API_KEY
-        )
-
-        # 4. Chroma client + retriever
         client = CloudClient(api_key=CHROMA_API_KEY, tenant=CHROMA_TENANT, database=CHROMA_DATABASE)
-        vectordb = Chroma(
-            client=client,
-            collection_name=CHROMA_COLLECTION,
-            embedding_function=embedding_function
-        )
+        vectordb = Chroma(client=client, collection_name=CHROMA_COLLECTION, embedding_function=None)
         retriever = vectordb.as_retriever(search_kwargs={"k": 5})
-
-        # 5. Build RAG chain with prompt
-        return RetrievalQA.from_chain_type(
-            llm,
-            retriever=retriever,
-            chain_type_kwargs={"prompt": chat_prompt},
-            return_source_documents=True
-        )
-
+        return RetrievalQA.from_chain_type(llm, retriever=retriever, return_source_documents=True, input_key="query")
     except Exception as e:
+        # bubble up runtime error so /ask can fallback gracefully
         raise
 
 # ---------- 5. Routes ----------
@@ -241,7 +210,6 @@ def ask():
 
         # detect ocean name early so we can fallback to coords or local stats
         ocean_name = find_ocean_in_query(query)
-        rag_chain = None
 
         # Try to initialize RAG chain; if unavailable, return a helpful fallback for common queries
         try:
@@ -296,7 +264,7 @@ def ask():
             return jsonify({"error": "RAG chain unavailable and no local fallback applicable", "details": str(e)}), 503
 
         # If RAG chain available, run it and post-process sources
-        result = rag_chain({"query": query})
+        result = rag_chain.invoke({"query": query})
         docs = result.get("source_documents", []) or []
 
         # If an ocean was mentioned, filter the returned docs to that ocean region
