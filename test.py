@@ -3,7 +3,8 @@ import requests
 import json
 
 # Flask API URL (local test)
-URL = "http://127.0.0.1:5000/ask"
+# URL = "http://127.0.0.1:5000/ask"
+URL="https://rag-flask-y4y1.onrender.com/ask"
 
 # Test queries
 test_queries = [
@@ -15,7 +16,7 @@ test_queries = [
 for query in test_queries:
     print(f"\n--- Query: {query} ---")
     try:
-        response = requests.post(URL, json={"query": query}, timeout=15)
+        response = requests.post(URL, json={"query": query}, timeout=120)
         if response.status_code == 200:
             data = response.json()
             print("✅ Response:")

@@ -22,7 +22,7 @@ GEMINI_API_KEY = _env("GEMINI_API_KEY")
 CHROMA_API_KEY = _env("CHROMA_API_KEY")
 CHROMA_TENANT = _env("CHROMA_TENANT")
 CHROMA_DATABASE = _env("CHROMA_DATABASE") or "flask_rag_db"
-CHROMA_COLLECTION = _env("CHROMA_COLLECTION") or "argo_dataset"
+CHROMA_COLLECTION = _env("CHROMA_COLLECTION") or "argo_data_local"
 
 # Warnings instead of asserts so the server can start for debugging
 if not GEMINI_API_KEY:
